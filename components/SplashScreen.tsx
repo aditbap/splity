@@ -108,8 +108,8 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
                 </svg>
             </div>
 
-            <p className="absolute bottom-10 text-xs text-neutral-600 font-medium">
-                Made from kerala 🌴 by <span className="text-yellow-500">Zythos.co</span>
+            <p className="absolute bottom-10 text-xs text-neutral-600 font-medium font-poor-story">
+                this app made for my gf
             </p>
         </motion.div>
     );
