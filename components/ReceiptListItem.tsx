@@ -48,11 +48,14 @@ export default function ReceiptListItem({ receipt, index, onSelect, onDelete, ge
     };
 
     const handleConfirmDelete = async () => {
+        // Trigger delete immediately
+        onDelete(receipt._id);
+
         setShowConfirm(false);
         setIsDeleting(true);
-        // Animate out
-        await controls.start({ x: -500, opacity: 0, transition: { duration: 0.3 } });
-        onDelete(receipt._id);
+
+        // Animation is secondary
+        controls.start({ x: -500, opacity: 0, transition: { duration: 0.3 } });
     };
 
     const handleCancelDelete = () => {
@@ -117,18 +120,21 @@ export default function ReceiptListItem({ receipt, index, onSelect, onDelete, ge
             </div>
 
             <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
-                <DialogContent className="bg-[#1e1e1e] border-white/10 text-white sm:max-w-md rounded-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Delete this split?</DialogTitle>
-                        <DialogDescription className="text-neutral-400">
-                            This action cannot be undone. This will permanently delete the receipt and all associated data.
+                <DialogContent
+                    className="bg-[#1e1e1e] border-white/10 text-white w-[85vw] max-w-xs rounded-xl p-4 gap-3 [&>button]:hidden"
+                    onInteractOutside={(e) => e.preventDefault()}
+                >
+                    <DialogHeader className="gap-1">
+                        <DialogTitle className="text-base">Delete this split?</DialogTitle>
+                        <DialogDescription className="text-xs text-neutral-400">
+                            This cannot be undone. Permanently delete?
                         </DialogDescription>
                     </DialogHeader>
-                    <DialogFooter className="flex gap-2 sm:justify-end">
-                        <Button variant="outline" onClick={handleCancelDelete} className="bg-transparent border-white/10 hover:bg-white/5 text-white hover:text-white">
+                    <DialogFooter className="flex gap-2 sm:justify-end mt-1">
+                        <Button variant="outline" size="sm" onClick={handleCancelDelete} className="bg-transparent border-white/10 hover:bg-white/5 text-white hover:text-white h-8 text-xs px-3">
                             Cancel
                         </Button>
-                        <Button variant="destructive" onClick={handleConfirmDelete}>
+                        <Button variant="destructive" size="sm" onClick={handleConfirmDelete} className="h-8 text-xs px-3">
                             Delete
                         </Button>
                     </DialogFooter>

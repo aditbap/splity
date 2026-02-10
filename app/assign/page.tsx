@@ -16,6 +16,8 @@ export default function AssignPage() {
     const participants = useAppStore(state => state.participants);
     const assignments = useAppStore(state => state.assignments);
     const toggleAssignment = useAppStore(state => state.toggleAssignment);
+    const addAssignment = useAppStore(state => state.addAssignment);
+    const removeAssignment = useAppStore(state => state.removeAssignment);
     const receiptId = useAppStore(state => state.receiptId);
 
     // Auto-save assignments
@@ -111,13 +113,52 @@ export default function AssignPage() {
 
                             <div className="flex flex-wrap gap-2 mt-1">
                                 {participants.map((p) => {
-                                    const active = isAssigned(itemId, p.id);
+                                    // Check how many times this participant is assigned
+                                    const assignedList = assignments.find(a => a.itemId === itemId)?.participantIds || [];
+                                    const count = assignedList.filter(id => id === p.id).length;
+                                    const active = count > 0;
+
+                                    // Handle Interaction
+                                    const handleInteraction = () => {
+                                        if (item.quantity > 1) {
+                                            // Multi-assign mode
+
+                                            // 1. If not full, simply ADD
+                                            if (assignedList.length < item.quantity) {
+                                                addAssignment(itemId, p.id);
+                                            }
+                                            // 2. If FULL (or more), check if we can REMOVE from this person
+                                            else {
+                                                if (active) {
+                                                    // If this person has an assignment, tapping again REMOVES one
+                                                    removeAssignment(itemId, p.id);
+                                                } else {
+                                                    // If full and this person has NONE, shake to indicate "Cannot Add"
+                                                    const btn = document.getElementById(`btn-${itemId}-${p.id}`);
+                                                    if (btn) {
+                                                        btn.classList.add('animate-shake');
+                                                        setTimeout(() => btn.classList.remove('animate-shake'), 300);
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            // Standard toggle
+                                            toggleAssignment(itemId, p.id);
+                                        }
+                                    };
+
                                     return (
                                         <button
                                             key={p.id}
-                                            onClick={() => toggleAssignment(itemId, p.id)}
+                                            id={`btn-${itemId}-${p.id}`}
+                                            onClick={handleInteraction}
+                                            // Right click / Long press to remove (desktop/mobile)
+                                            onContextMenu={(e) => {
+                                                e.preventDefault();
+                                                if (item.quantity > 1 && active) removeAssignment(itemId, p.id);
+                                            }}
                                             className={cn(
-                                                "flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 select-none active:scale-95",
+                                                "relative flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 select-none active:scale-95",
                                                 active
                                                     ? "bg-primary text-primary-foreground shadow-[0_0_15px_-3px_rgba(var(--primary),0.4)]"
                                                     : "bg-[#000000] text-neutral-400 hover:bg-white/5 hover:text-white"
@@ -125,6 +166,12 @@ export default function AssignPage() {
                                         >
                                             <div className={cn("h-2 w-2 rounded-full", active ? "bg-white" : getAvatarColor(p.name))} />
                                             {p.name}
+                                            {/* Count Badge for Multi-assign */}
+                                            {item.quantity > 1 && active && (
+                                                <span className="ml-1 bg-white/20 px-1.5 py-0.5 rounded-full text-[10px] font-bold min-w-[1.2em]">
+                                                    {count}
+                                                </span>
+                                            )}
                                         </button>
                                     );
                                 })}

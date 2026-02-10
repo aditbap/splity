@@ -29,5 +29,13 @@ export const ApiService = {
             body: JSON.stringify(data),
         });
         return res.json();
+    },
+    createManualReceipt: async (userId?: string, parsedData?: any): Promise<{ success: boolean; data: any; id: string }> => {
+        const res = await fetch('/api/receipt/manual', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, parsedData }),
+        });
+        return res.json();
     }
 };

@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Trash2, Plus, Receipt, Save, GripVertical, ArrowLeft, ArrowRight } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/lib/utils';
 import { ApiService } from '@/services/api';
+import { getDeviceId } from '@/lib/device-id';
 import VerifyListItem from '@/components/VerifyListItem';
 
 export default function VerifyPage() {
@@ -18,8 +19,10 @@ export default function VerifyPage() {
     const setParsedData = useAppStore(state => state.setParsedData);
     const receiptId = useAppStore(state => state.receiptId);
 
-    // Auto-save logic hooks...
+    // Auto-save & Defere Creation Logic
+    const isCreatingRef = useRef(false);
     const parsedDataRef = useRef(parsedData);
+
     useEffect(() => {
         parsedDataRef.current = parsedData;
     }, [parsedData]);
@@ -29,12 +32,45 @@ export default function VerifyPage() {
     }, [parsedData, router]);
 
     useEffect(() => {
-        if (!receiptId || !parsedData) return;
+        if (!parsedData) return;
+
+        // Case 1: Deferred Creation (No ID yet)
+        if (!receiptId) {
+            // Only create if user has added items or changed merchant name significantly
+            // We check items length > 0
+            if (parsedData.items && parsedData.items.length > 0 && !isCreatingRef.current) {
+                isCreatingRef.current = true;
+                const userId = getDeviceId();
+
+                // Double check to prevent race conditions
+                if (parsedData.items.length === 0) {
+                    isCreatingRef.current = false;
+                    return;
+                }
+
+                ApiService.createManualReceipt(userId, parsedData)
+                    .then(res => {
+                        if (res.success && res.id) {
+                            useAppStore.setState({ receiptId: res.id });
+                            isCreatingRef.current = false;
+                            console.log("Deferred Receipt Created:", res.id);
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Failed to create deferred receipt", err);
+                        isCreatingRef.current = false;
+                    });
+            }
+            return;
+        }
+
+        // Case 2: Update existing (Auto-save)
         const save = () => ApiService.updateReceipt(receiptId, { parsedData });
         const timeoutId = setTimeout(save, 500);
         return () => clearTimeout(timeoutId);
     }, [parsedData, receiptId]);
 
+    // Cleanup save not needed as much for new logic, but good practice
     useEffect(() => {
         return () => {
             if (receiptId && parsedDataRef.current) {
@@ -76,11 +112,45 @@ export default function VerifyPage() {
         });
     };
 
+    const splitItem = (index: number) => {
+        const itemToSplit = parsedData.items[index];
+        const qty = itemToSplit.quantity;
+
+        if (qty <= 1) return;
+
+        const unitPrice = itemToSplit.price / qty;
+        const newItems = [...parsedData.items];
+
+        // Remove the original item
+        newItems.splice(index, 1);
+
+        // Add 'qty' number of new items
+        for (let i = 0; i < qty; i++) {
+            newItems.splice(index + i, 0, {
+                name: `${itemToSplit.name} (${i + 1})`,
+                price: unitPrice,
+                quantity: 1
+            });
+        }
+
+        setParsedData({ ...parsedData, items: newItems });
+    };
+
     const totalCalculated =
         parsedData.items.reduce((sum, item) => sum + (item.price || 0), 0) +
         (parsedData.tax || 0) +
         (parsedData.serviceCharge || 0) -
         (parsedData.discount || 0);
+
+    // Auto-update total in store/DB when items change
+    useEffect(() => {
+        if (!parsedData || parsedData.total === totalCalculated) return;
+
+        // Use functional update to avoid dependency on full parsedData object if possible,
+        // but here we just need to ensure we don't loop. 
+        // We checked totalCalculated vs parsedData.total above.
+        setParsedData({ ...parsedData, total: totalCalculated });
+    }, [totalCalculated, parsedData.items, parsedData.tax, parsedData.serviceCharge, parsedData.discount]);
 
     return (
         <div className="flex flex-col min-h-screen bg-[#000000] text-foreground max-w-md mx-auto relative font-sans">
@@ -148,6 +218,7 @@ export default function VerifyPage() {
                             index={index}
                             onChange={handleItemChange}
                             onDelete={removeItem}
+                            onSplit={splitItem}
                         />
                     ))}
 

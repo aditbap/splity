@@ -28,10 +28,15 @@ interface SimpleReceipt {
   assignments?: { itemId: string; participantIds: string[] }[];
 }
 
+// Module-level variable to track splash screen state across soft navigations
+let hasShownSplash = false;
+
 export default function Home() {
   const [recentReceipts, setRecentReceipts] = useState<SimpleReceipt[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const [showSplash, setShowSplash] = useState(true);
+
+  // Initialize based on whether we've shown it in this session (soft nav)
+  const [showSplash, setShowSplash] = useState(!hasShownSplash);
   const router = useRouter();
   const { setParsedData, setReceiptId, setReceiptImage, participants, reset } = useAppStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -40,8 +45,11 @@ export default function Home() {
     // Client-side only ID generation
     const userId = getDeviceId();
 
-    // 1. Fetch List
-    fetch(`/api/receipt/list?userId=${userId}`)
+    // 1. Fetch List - Add timestamp to force fresh fetch
+    fetch(`/api/receipt/list?userId=${userId}&t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
+    })
       .then(res => res.json())
       .then(data => {
         if (data.success) {
@@ -141,12 +149,17 @@ export default function Home() {
     setRecentReceipts(prev => prev.filter(r => r._id !== id));
 
     try {
+      console.log("handleDeleteReceipt CALLED for ID:", id);
+      console.log("Sending DELETE request to server...");
       const res = await fetch(`/api/receipt/${id}`, { method: 'DELETE' });
+      console.log("DELETE response status:", res.status);
       const data = await res.json();
 
       if (!data.success) {
         throw new Error(data.error || 'Failed to delete');
       }
+      console.log("Delete success, refreshing...");
+      router.refresh(); // Force Next.js to revalidate server data if any
     } catch (err) {
       console.error("Error deleting receipt", err);
       // Revert if failed
@@ -196,6 +209,24 @@ export default function Home() {
     }
   };
 
+  const handleManualSplit = () => {
+    // Local init only - Defer creation until items interact
+    reset();
+    const emptyData = {
+      merchantName: "Manual Entry",
+      date: new Date(),
+      items: [],
+      total: 0,
+      tax: 0,
+      serviceCharge: 0,
+      discount: 0
+    };
+    // @ts-ignore - parsedData structure matches but strict type might complain about missing fields
+    setParsedData(emptyData, "Manual Entry (No OCR)");
+    setReceiptId(null); // Explicitly null to signal "not saved yet"
+    router.push('/verify');
+  };
+
   const triggerFileInput = () => {
     fileInputRef.current?.click();
   };
@@ -209,7 +240,10 @@ export default function Home() {
   return (
     <div className="flex flex-col min-h-screen bg-[#000000] text-foreground max-w-md mx-auto relative overflow-hidden font-sans">
       {/* Splash Screen */}
-      {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
+      {showSplash && <SplashScreen onComplete={() => {
+        setShowSplash(false);
+        hasShownSplash = true; // Mark as shown for subsequent navigations
+      }} />}
 
       {/* Full Screen Processing State */}
       {isUploading && (
@@ -295,7 +329,10 @@ export default function Home() {
         </div>
 
         {/* Manual Split Card */}
-        <div className="relative overflow-hidden rounded-2xl bg-[#262626] border border-white/5 p-4 flex items-center shadow-lg cursor-not-allowed opacity-80 group">
+        <div
+          onClick={handleManualSplit}
+          className={`relative overflow-hidden rounded-2xl bg-[#262626] border border-white/5 p-4 flex items-center shadow-lg hover:border-white/20 transition-all active:scale-[0.98] group cursor-pointer ${isUploading ? 'opacity-70 pointer-events-none' : ''}`}
+        >
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-orange-500/10 flex items-center justify-center shrink-0 border border-orange-500/20">
               <div className="text-2xl">🧶</div> {/* Placeholder for yarn icon */}
@@ -305,13 +342,16 @@ export default function Home() {
               <p className="text-sm text-neutral-500 font-medium">Without OCR</p>
             </div>
           </div>
+          <div className="ml-auto pr-2 group-hover:translate-x-1 transition-transform">
+            <ArrowRight className="text-neutral-400 group-hover:text-white transition-all h-5 w-5" />
+          </div>
         </div>
 
         {/* Recent Splits Section */}
         <div className="mt-4">
           <div className="flex justify-between items-center mb-4 px-1">
             <h2 className="text-lg font-bold text-white">Your Recent Splits</h2>
-            <Link href="#" className="text-yellow-500 text-sm font-semibold hover:underline">See all</Link>
+            <Link href="/history" className="text-yellow-500 text-sm font-semibold hover:underline">See all</Link>
           </div>
 
           {recentReceipts.length === 0 ? (

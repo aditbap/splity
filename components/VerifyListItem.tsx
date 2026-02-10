@@ -17,9 +17,10 @@ interface VerifyListItemProps {
     index: number;
     onChange: (index: number, field: 'name' | 'price' | 'quantity', value: string) => void;
     onDelete: (index: number) => void;
+    onSplit?: (index: number) => void;
 }
 
-export default function VerifyListItem({ item, index, onChange, onDelete }: VerifyListItemProps) {
+export default function VerifyListItem({ item, index, onChange, onDelete, onSplit }: VerifyListItemProps) {
     const controls = useAnimation();
     const [isDeleting, setIsDeleting] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
@@ -43,6 +44,13 @@ export default function VerifyListItem({ item, index, onChange, onDelete }: Veri
     const handleCancelDelete = () => {
         setShowConfirm(false);
         controls.start({ x: 0 });
+    };
+
+    const handleSplitItem = () => {
+        // Check if onSplit is provided and valid
+        if (onSplit && item.quantity > 1) {
+            onSplit(index);
+        }
     };
 
     if (isDeleting) return null;
@@ -82,8 +90,17 @@ export default function VerifyListItem({ item, index, onChange, onDelete }: Veri
                                 onChange={(e) => onChange(index, 'quantity', e.target.value)}
                                 className="w-12 h-9 text-center bg-[#000000] border-white/5 text-sm p-0 text-white"
                                 inputMode="numeric"
-                                onPointerDown={(e) => e.stopPropagation()} // Prevent drag when interacting with input
+                                onPointerDown={(e) => e.stopPropagation()}
                             />
+                            {/* Split Button (Only if Qty > 1) */}
+                            {item.quantity > 1 && (
+                                <button
+                                    onClick={handleSplitItem}
+                                    className="text-[10px] text-primary hover:text-primary/80 font-medium underline mt-1"
+                                >
+                                    Split
+                                </button>
+                            )}
                         </div>
 
                         {/* Main Item inputs */}
@@ -112,18 +129,18 @@ export default function VerifyListItem({ item, index, onChange, onDelete }: Veri
             </div>
 
             <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
-                <DialogContent className="bg-[#1e1e1e] border-white/10 text-white sm:max-w-md rounded-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Delete this item?</DialogTitle>
-                        <DialogDescription className="text-neutral-400">
+                <DialogContent className="bg-[#1e1e1e] border-white/10 text-white sm:max-w-md rounded-2xl w-[85vw] max-w-xs p-4 gap-3 [&>button]:hidden" onInteractOutside={(e) => e.preventDefault()}>
+                    <DialogHeader className="gap-1">
+                        <DialogTitle className="text-base">Delete this item?</DialogTitle>
+                        <DialogDescription className="text-xs text-neutral-400">
                             Are you sure you want to remove "{item.name}"?
                         </DialogDescription>
                     </DialogHeader>
-                    <DialogFooter className="flex gap-2 sm:justify-end">
-                        <Button variant="outline" onClick={handleCancelDelete} className="bg-transparent border-white/10 hover:bg-white/5 text-white hover:text-white">
+                    <DialogFooter className="flex gap-2 sm:justify-end mt-1">
+                        <Button variant="outline" size="sm" onClick={handleCancelDelete} className="bg-transparent border-white/10 hover:bg-white/5 text-white hover:text-white h-8 text-xs px-3">
                             Cancel
                         </Button>
-                        <Button variant="destructive" onClick={handleConfirmDelete}>
+                        <Button variant="destructive" size="sm" onClick={handleConfirmDelete} className="h-8 text-xs px-3">
                             Delete
                         </Button>
                     </DialogFooter>

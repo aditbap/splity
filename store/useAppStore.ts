@@ -15,7 +15,7 @@ interface AppState {
     assignments: Assignment[]; // itemId -> participantIds
 
     // Actions
-    setReceiptId: (id: string) => void;
+    setReceiptId: (id: string | null) => void;
     setReceiptImage: (url: string) => void;
     setProcessing: (loading: boolean) => void;
     setParsedData: (data: ReceiptData, rawText?: string) => void;
@@ -26,6 +26,8 @@ interface AppState {
 
     assignItem: (itemId: string, participantId: string) => void;
     toggleAssignment: (itemId: string, participantId: string) => void;
+    addAssignment: (itemId: string, participantId: string) => void;
+    removeAssignment: (itemId: string, participantId: string) => void;
     reset: () => void;
 }
 
@@ -38,7 +40,7 @@ export const useAppStore = create<AppState>((set) => ({
     participants: [],
     assignments: [],
 
-    setReceiptId: (id: string) => set({ receiptId: id }),
+    setReceiptId: (id) => set({ receiptId: id }),
     setReceiptImage: (url) => set({ receiptImage: url }),
     setProcessing: (loading) => set({ isProcessing: loading }),
     setParsedData: (data, rawText) => set({ parsedData: data, rawText: rawText || '' }),
@@ -92,6 +94,46 @@ export const useAppStore = create<AppState>((set) => ({
             newAssignments.push({ itemId, participantIds: [participantId] });
         }
 
+        return { assignments: newAssignments };
+    }),
+
+    addAssignment: (itemId, participantId) => set((state) => {
+        const existingAssignment = state.assignments.find(a => a.itemId === itemId);
+        let newAssignments = [...state.assignments];
+
+        if (existingAssignment) {
+            // Simply push the ID (allowing duplicates for weighting)
+            newAssignments = newAssignments.map(a =>
+                a.itemId === itemId
+                    ? { ...a, participantIds: [...a.participantIds, participantId] }
+                    : a
+            );
+        } else {
+            newAssignments.push({ itemId, participantIds: [participantId] });
+        }
+        return { assignments: newAssignments };
+    }),
+
+    removeAssignment: (itemId, participantId) => set((state) => {
+        const existingAssignment = state.assignments.find(a => a.itemId === itemId);
+        if (!existingAssignment) return {};
+
+        let newAssignments = [...state.assignments];
+        const index = existingAssignment.participantIds.indexOf(participantId);
+
+        if (index > -1) {
+            // Remove ONLY ONE instance
+            const newPids = [...existingAssignment.participantIds];
+            newPids.splice(index, 1);
+
+            if (newPids.length === 0) {
+                newAssignments = newAssignments.filter(a => a.itemId !== itemId);
+            } else {
+                newAssignments = newAssignments.map(a =>
+                    a.itemId === itemId ? { ...a, participantIds: newPids } : a
+                );
+            }
+        }
         return { assignments: newAssignments };
     }),
 

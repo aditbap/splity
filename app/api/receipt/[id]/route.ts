@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import Receipt from '@/models/Receipt';
+import { logDebug } from '@/lib/server-logger';
 
 export async function GET(
     request: NextRequest,
@@ -32,23 +33,31 @@ export async function DELETE(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    let receiptId = 'unknown';
     try {
         await connectDB();
         const { id } = await params;
+        receiptId = id;
+
+        logDebug(`[DELETE] Request received for ID: ${id}`);
 
         if (!id) {
+            logDebug('[DELETE] Error: No ID provided');
             return NextResponse.json({ error: 'Receipt ID is required' }, { status: 400 });
         }
 
         const deletedReceipt = await Receipt.findByIdAndDelete(id);
 
         if (!deletedReceipt) {
+            logDebug(`[DELETE] NOT FOUND: ${id}`);
             return NextResponse.json({ error: 'Receipt not found' }, { status: 404 });
         }
 
+        logDebug(`[DELETE] SUCCESS: ${id}`);
         return NextResponse.json({ success: true, message: 'Receipt deleted successfully' });
     } catch (error) {
-        console.error('Failed to delete receipt:', error);
+        logDebug(`[DELETE] ERROR: ${receiptId} - ${error}`);
+        console.error('[DELETE] Critical Error:', error);
         return NextResponse.json({ error: 'Failed to delete receipt' }, { status: 500 });
     }
 }

@@ -109,7 +109,7 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
             </div>
 
             <p className="absolute bottom-10 text-xs text-neutral-600 font-medium font-poor-story">
-                this app made for my gf
+                Copyright © 2026 Splity. All rights reserved.
             </p>
         </motion.div>
     );
